@@ -552,10 +552,18 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-	/* EXERCISE: Your code here */
-	return 0;
+  void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+  
+  uint32_t bit_count = 2;
+  for(bit_count; bit_count < ospfs_super->os_nblocks; bit_count++)
+    {
+      if(bitvector_test(freebitmap,bit_count) == 1) { //Indicates free block
+	bitvector_clear(freebitmap,bit_count);
+	return bit_count;
+      }
+      return 0; //No block found. Disk is full
+    }
 }
-
 
 // free_block(blockno)
 //	Use this function to free an allocated block.
@@ -571,7 +579,11 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-	/* EXERCISE: Your code here */
+  void *freebitmap = ospfs_bk(OSPFS_FREEMAP_BLK);
+
+  //Check if block is not bogus
+  if(blockno >= (ospfs_super->os_firstinob+ospfs_super->os_nblocks) && blockno < ospfs_super->os_nblocks)
+    bitvector_set(freebitmap,blockno);
 }
 
 
