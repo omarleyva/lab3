@@ -95,7 +95,7 @@ typedef struct ospfs_super {
 // Number of block pointers in an indirect block.
 #define OSPFS_NINDIRECT		(OSPFS_BLKSIZE / 4)
 // Maximum number of blocks in a file.
-#define OSPFS_MAXFILEBLKS	\
+#define OSPFS_MAXFILEBLKS       \
 	(OSPFS_NDIRECT					  /* direct blocks */ \
 	 + OSPFS_NINDIRECT	    /* blocks pointed to by indirect block */ \
 	 + OSPFS_NINDIRECT * OSPFS_NINDIRECT)   /* ... by indirect^2 block */

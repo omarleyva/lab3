@@ -552,10 +552,18 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-	/* EXERCISE: Your code here */
-	return 0;
+  void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+  
+  uint32_t bit_count = 2;
+  for(bit_count; bit_count < ospfs_super->os_nblocks; bit_count++)
+    {
+      if(bitvector_test(freebitmap,bit_count) == 1) { //Indicates free block
+	bitvector_clear(freebitmap,bit_count);
+	return bit_count;
+      }
+      return 0; //No block found. Disk is full
+    }
 }
-
 
 // free_block(blockno)
 //	Use this function to free an allocated block.
@@ -571,7 +579,11 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-	/* EXERCISE: Your code here */
+  void *freebitmap = ospfs_bk(OSPFS_FREEMAP_BLK);
+
+  //Check if block is not bogus
+  if(blockno >= (ospfs_super->os_firstinob+ospfs_super->os_nblocks) && blockno < ospfs_super->os_nblocks)
+    bitvector_set(freebitmap,blockno);
 }
 
 
@@ -1029,9 +1041,20 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	// 2. If there's no empty entries, add a block to the directory.
 	//    Use ERR_PTR if this fails; otherwise, clear out all the directory
 	//    entries and return one of them.
-
-	/* EXERCISE: Your code here. */
-	return ERR_PTR(-EINVAL); // Replace this line
+        
+        uint32_t offset;
+        for(offset = 0; offset < dir_oi->oi_size; offset+=OSPFS_DIRENTRY_SIZE) //Iterates through each dir
+	  {	                                                               //entry of the inode. 
+	    ospfs_direntry_t *dir = ospfs_inode_data(dir_oi,offset);
+	    if(dir->od_ino == 0) //Inode doesn't exist for that dir entry. 
+	      return dir;
+	  }
+	
+	int r = add_block(dir_oi);
+	if(r < 0)
+	  return ERR_PTR(r);
+	
+	return ospfs_inode_data(dir_oi,offset);
 }
 
 // ospfs_link(src_dentry, dir, dst_dentry
@@ -1064,9 +1087,20 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 //   EXERCISE: Complete this function.
 
 static int
-ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) {
-	/* EXERCISE: Your code here. */
-	return -EINVAL;
+ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dentry) 
+{
+        ospfs_inode_t *src = ospfs_inode(src_dentry->d_inode->i_ino);
+	ospfs_direntry_t *new_entry = create_blank_direntry(ospfs_inode(dir->i_ino));
+
+        //NEED TO DO ERROR CHECKS!! 	
+
+	new_entry->od_ino = src_dentry->d_inode->i_ino;
+	memcpy(new_entry->od_name,dst_dentry->d_name.name,dst_dentry->d_name.len);
+	new_entry->od_name[dst_dentry->d_name.len] == '\0'; //Must be null terminated. Length not passed in direntry
+	src->oi_nlink++;
+	
+	
+	return 0;
 }
 
 // ospfs_create
