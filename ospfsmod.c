@@ -43,6 +43,7 @@ static ospfs_super_t * const ospfs_super =
 static int change_size(ospfs_inode_t *oi, uint32_t want_size);
 static ospfs_direntry_t *find_direntry(ospfs_inode_t *dir_oi, const char *name, int namelen);
 
+//Checking to see if this works... Israel
 
 /*****************************************************************************
  * FILE SYSTEM OPERATIONS STRUCTURES
