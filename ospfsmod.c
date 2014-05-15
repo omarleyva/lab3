@@ -442,19 +442,62 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (ok_so_far >= 0)
 			f_pos++;
 	}
-
+	eprintk("hi1\n");
 	// actual entries
 	while (r == 0 && ok_so_far >= 0 && f_pos >= 2) {
-		ospfs_direntry_t *od;
-		ospfs_inode_t *entry_oi;
 
+	  //Get a pointer to next entry in directory. 
+	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,f_pos);
+	  ospfs_inode_t *entry_oi = ospfs_inode(od->od_ino);
+	  uint32_t file_type;	
+	  
+	  //r = 1 when end of directory
+	  if((f_pos-2)*OSPFS_DIRENTRY_SIZE > dir_oi->oi_size)
+	    {
+	      r = 1;
+	      break;
+	    }
+	  
+	  eprintk("hi2\n");
+	  //Ignore blank directory entries. 
+	  if(od == 0)
+	    {
+	  eprintk("hi3\n");	  
+	      f_pos++;
+	      continue;
+	    }
+ eprintk("hi3\n");	  
+	  //Figure out whether file is reg/dir/symlink
+	  if(entry_oi->oi_ftype == OSPFS_FTYPE_REG)
+	    file_type = DT_REG;
+	  if(entry_oi->oi_ftype == OSPFS_FTYPE_DIR)
+	    file_type = DT_DIR;
+	  if(entry_oi->oi_ftype == OSPFS_FTYPE_SYMLINK)
+	    file_type = DT_LNK;
+ 	  eprintk("hi3\n");	  
+	  //Fill directory entry. 
+	  ok_so_far = filldir(dirent,od->od_name,strlen(od->od_name),f_pos,od->od_ino,file_type);
+
+	  //Advance f_pos when dir successfully read
+	  if(ok_so_far >= 0)
+	    {
+	      eprintk("hi4\n");
+	      f_pos++;
+	    }
+	  else
+	    {
+	      r = 0;
+	      break;
+	    }
+		
 		/* If at the end of the directory, set 'r' to 1 and exit
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		r = 1;		/* Fix me! */
+	  
+	  r = 1;		/* Fix me! */
 		break;		/* Fix me! */
-
+		
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
 		 * directory-file as a sequence of ospfs_direntry structures.
@@ -474,7 +517,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * your function should advance f_pos by the proper amount to
 		 * advance to the next directory entry.
 		 */
-
+		
 		/* EXERCISE: Your code here */
 	}
 
@@ -1121,9 +1164,50 @@ static int
 ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
+	ospfs_inode_t *entry_inode;
+
 	uint32_t entry_ino = 0;
 	/* EXERCISE: Your code here. */
-	return -EINVAL; // Replace this line
+	
+	//   1. Check for the -EEXIST error
+	if(find_direntry(dir_oi,dentry->d_name.name,dentry->d_name.len) != NULL)
+	  return -EEXIST;
+
+	//ERROR CHECKS!!
+
+	//   1.5 Find an empty directory entry using the helper functions above.
+	ospfs_direntry_t *new_entry = create_blank_direntry(ospfs_inode(dir->i_ino));	
+
+	//   2. Find an empty inode.  Set the 'entry_ino' variable to its inode number.
+	uint32_t inode_count = 0;
+	for(inode_count = 2; inode_count < ospfs_super->os_ninodes; inode_count++)
+	  {
+	    entry_inode = ospfs_inode(inode_count); //Obtain pointer to new inode
+	    if(entry_inode && entry_inode->oi_nlink == 0) //Empty inode
+	      {
+		entry_ino = inode_count;
+		break;
+	      }
+	  }
+
+	if(entry_ino == 0) //No inode available. 
+	  return -ENOSPC;
+
+
+	//   3. Initialize the directory entry
+	new_entry->od_ino = entry_ino;
+	memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
+	new_entry->od_name[dentry->d_name.len] == '\0';
+	//Must be null terminated. Length not passed in direntry
+	entry_inode->oi_nlink++;
+
+	//   4. Initialize the inode
+	entry_inode->oi_size = 0;
+	entry_inode->oi_ftype = OSPFS_FTYPE_REG;
+	entry_inode->oi_nlink++;
+	entry_inode->oi_mode = mode;
+	entry_inode->oi_indirect = 0;
+	entry_inode->oi_indirect2 = 0;
 
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
