@@ -824,8 +824,10 @@ remove_block(ospfs_inode_t *oi)
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
+        oi->oi_size -= OSPFS_BLKSIZE;
+    
 	/* EXERCISE: Your code here */
-	eprinkt("remove block\n");
+	eprintk("remove block\n");
         return -EIO; // Replace this line
 }
 
@@ -871,6 +873,7 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 {
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
+        int add_return = 0;
 
         if (new_size == old_size)
             return r;
@@ -878,20 +881,31 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) 
         {
 	        /* EXERCISE: Your code here */
-                eprintk("chanze_size 1\n");
-		return -EIO; // Replace this line
+                eprintk("change_size 1\n");
+                add_return = add_block(oi);
+                if (add_return == -ENOSPC)
+                    new_size = old_size;
+		//return -EIO; // Replace this line
 	}
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) 
         {
 	        /* EXERCISE: Your code here */
-                eprintk("chanze_size 2\n");
-		return -EIO; // Replace this line
+                eprintk("change_size 2\n");
+                remove_block(oi); 
+	        //return -EIO; // Replace this line
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
 	             and return the proper value. */
         eprintk("chanze_size 3\n");
-	return -EIO; // Replace this line
+        if (add_return == -ENOSPC)
+           return -ENOSPC;
+        else
+        {   
+           oi->oi_size = new_size;
+           return r;
+        }
+	//return -EIO; // Replace this line
 }
 
 
@@ -958,13 +972,14 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
 
+        
         if (oi->oi_size < count + *f_pos)
         {
-           printk("count is larger than file size\n file size: %d count: %d\n",
-                     oi->oi_size+*f_pos, count);
+           eprintk("count is larger than file size\n       file size: %d count: %d\n",
+                     oi->oi_size, count+*f_pos);
            count = oi->oi_size-*f_pos;
         }
-        printk("after check, file: %d count %d\n", oi->oi_size, count);
+        eprintk("pos: %d, size: %d, count: %d\n", *f_pos, oi->oi_size, count); 
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
 		uint32_t blockno = ospfs_inode_blockno(oi, *f_pos);
@@ -995,11 +1010,11 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
                 if (n > remain)
                    n = remain;          
 
-                printk("copying to user\n");
+                eprintk("copying to user\n");
                 int ctu = copy_to_user(buffer, data+offset, n);
                 if (ctu > 0)
                 {
-                    printk ("bytes over: %d\n", ctu);
+                    eprintk ("bytes over: %d\n", ctu);
                     retval = -EFAULT;
                     goto done;
                 }
