@@ -561,15 +561,15 @@ allocate_block(void)
 {
   void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
   
-  uint32_t bit_count = 2;
-  for(bit_count; bit_count < ospfs_super->os_nblocks; bit_count++)
+  uint32_t bit_count = 0;
+  for(; bit_count < ospfs_super->os_nblocks; bit_count++)
     {
       if(bitvector_test(freebitmap,bit_count) == 1) { //Indicates free block
 	bitvector_clear(freebitmap,bit_count);
 	return bit_count;
       }
-      return 0; //No block found. Disk is full
     }
+  return 0; //No block found. Disk is full
 }
 
 
@@ -587,9 +587,9 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-  void *freebitmap = ospfs_bk(OSPFS_FREEMAP_BLK);
+  void *freebitmap = ospfs_block(OSPFS_FREEMAP_BLK);
 
-  //Check if block is not bogus
+  //Check if block is bogus
   if(blockno >= (ospfs_super->os_firstinob+ospfs_super->os_nblocks) && blockno < ospfs_super->os_nblocks)
     bitvector_set(freebitmap,blockno);
 }
@@ -696,19 +696,62 @@ direct_index(uint32_t b)
 //  2) store the disk block number of any newly allocated block
 //     in the appropriate place in the inode or one of the
 //     indirect blocks.
-//  3) update the oi->oi_size field
 
 static int
 add_block(ospfs_inode_t *oi)
 {
 	// current number of blocks in file
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
+	eprintk("n = %d\n",n);
 
 	// keep track of allocations to free in case of -ENOSPC
-	uint32_t *allocated[2] = { 0, 0 };
+	uint32_t allocated[2] = { 0, 0 };
 
 	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+	
+	//Less than direct block pointer
+	if(n < OSPFS_NDIRECT)
+	  {
+	    allocated[0] = allocate_block();
+	    if(allocated[0] == 0) //Unable to allocate a block
+	      return -ENOSPC; 
+	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
+	    oi->oi_direct[n+1] = allocated[0];
+	  }
+	
+	if(n == OSPFS_NDIRECT) //Must allocate indirect block
+	  {
+	    eprintk("hi\n");
+	    allocated[0] = allocate_block();
+	    if(allocated[0] == 0) //Unable to allocate a block
+	      return -ENOSPC; 
+	    
+	    eprintk("block = %d\n",allocated[0]);
+	    
+	    allocated[1] = allocate_block();
+	    if(allocated[0] == 0) //Unable to allocate a block
+	      {
+		free_block(allocated[0]);
+		return -ENOSPC; 
+	      }	    
+
+	    //Create new indirect_block
+	    uint32_t *indirect_block = ospfs_block(allocated[0]);
+	    memset(indirect_block,0,OSPFS_BLKSIZE);
+	    memset(ospfs_block(allocated[1]),0,OSPFS_BLKSIZE);
+	    
+	    //First value is set to data block
+	    indirect_block[0] = allocated[1];
+	    oi->oi_indirect = allocated[0];
+
+	    
+	  }
+	// Update the oi->oi_size field
+	oi->oi_size += OSPFS_BLKSIZE;
+	
+	
+	
+	return 0; // Replace this line
 }
 
 
@@ -1164,13 +1207,12 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 {
 	ospfs_inode_t *dir_oi = ospfs_inode(dir->i_ino);
 	ospfs_inode_t *entry_inode;
-
+	eprintk("nlink = %d\n",dir_oi->oi_nlink);
 	uint32_t entry_ino = 0;
-	return -EINVAL; //relpace this line
 
-	/* EXERCISE: Your code here. 
+	/* EXERCISE: Your code here. */
 	
-	//   1. Check for the -EEXIST error
+	// Check for the -EEXIST error
 	if(find_direntry(dir_oi,dentry->d_name.name,dentry->d_name.len) != NULL)
 	  return -EEXIST;
 
@@ -1178,14 +1220,15 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 
 	eprintk("1\n");
 
-	//   1.5 Find an empty directory entry using the helper functions above.
-	ospfs_direntry_t *new_entry = create_blank_direntry(ospfs_inode(dir->i_ino));	
-
+	// Find an empty directory entry using the helper functions above.
+	ospfs_direntry_t *new_entry = create_blank_direntry(dir_oi);	
+	if (IS_ERR(new_entry))
+	  return PTR_ERR(new_entry);
 	eprintk("2\n");
 
-	//   2. Find an empty inode.  Set the 'entry_ino' variable to its inode number.
+	// Find an empty inode.  Set the 'entry_ino' variable to its inode number.
 	uint32_t inode_count = 0;
-	for(inode_count = 2; inode_count < ospfs_super->os_ninodes; inode_count++)
+	for(inode_count = 0; inode_count < ospfs_super->os_ninodes; inode_count++)
 	  {
 	    entry_inode = ospfs_inode(inode_count); //Obtain pointer to new inode
 	    if(entry_inode && entry_inode->oi_nlink == 0) //Empty inode
@@ -1195,24 +1238,21 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	      }
 	  }
 
-	eprintk("3\n");
+
 
 	if(entry_ino == 0) //No inode available. 
 	  return -ENOSPC;
-
+	eprintk("3\n");
 
 	//   3. Initialize the directory entry
 	new_entry->od_ino = entry_ino;
 
-	eprintk("31\n");
+	eprintk("just set inode number\n");
 	memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
-	eprintk("32\n");
+	eprintk("just copied name onto new entry name\n");
 	new_entry->od_name[dentry->d_name.len] == '\0';
 	//Must be null terminated. Length not passed in direntry
 	eprintk("33\n");
-	entry_inode->oi_nlink++;
-
-	eprintk("4\n");
 
 	//   4. Initialize the inode
 	entry_inode->oi_size = 0;
@@ -1221,7 +1261,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	entry_inode->oi_mode = mode;
 	entry_inode->oi_indirect = 0;
 	entry_inode->oi_indirect2 = 0;
-	*/
+       
 
 
 	/* Execute this code after your function has successfully created the
