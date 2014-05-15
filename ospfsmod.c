@@ -825,7 +825,8 @@ remove_block(ospfs_inode_t *oi)
 	uint32_t n = ospfs_size2nblocks(oi->oi_size);
 
 	/* EXERCISE: Your code here */
-	return -EIO; // Replace this line
+	eprinkt("remove block\n");
+        return -EIO; // Replace this line
 }
 
 
@@ -871,17 +872,25 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 	uint32_t old_size = oi->oi_size;
 	int r = 0;
 
-	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) {
+        if (new_size == old_size)
+            return r;
+
+	while (ospfs_size2nblocks(oi->oi_size) < ospfs_size2nblocks(new_size)) 
+        {
 	        /* EXERCISE: Your code here */
+                eprintk("chanze_size 1\n");
 		return -EIO; // Replace this line
 	}
-	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
+	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) 
+        {
 	        /* EXERCISE: Your code here */
+                eprintk("chanze_size 2\n");
 		return -EIO; // Replace this line
 	}
 
 	/* EXERCISE: Make sure you update necessary file meta data
 	             and return the proper value. */
+        eprintk("chanze_size 3\n");
 	return -EIO; // Replace this line
 }
 
@@ -965,6 +974,7 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 
 		// ospfs_inode_blockno returns 0 on error
 		if (blockno == 0) {
+                        eprintk("read 1\n");
 			retval = -EIO;
 			goto done;
 		}
@@ -1053,6 +1063,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
                 uint32_t remain = count - amount;
 
 		if (blockno == 0) {
+                        eprintk("write 1\n");
 			retval = -EIO;
 			goto done;
 		}
