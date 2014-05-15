@@ -443,16 +443,13 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (ok_so_far >= 0)
 			f_pos++;
 	}
-	eprintk("hi1\n");
 	// actual entries
 	while (r == 0 && ok_so_far >= 0 && f_pos >= 2) {
 
 	  //Get a pointer to next entry in directory. 
-	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,f_pos*OSPFS_DIRENTRY_SIZE);
+	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,(f_pos-2)*OSPFS_DIRENTRY_SIZE);
 	  ospfs_inode_t *entry_oi = ospfs_inode(od->od_ino);
-	  uint32_t file_type;	
-	  
-	  
+	  uint32_t file_type;		  
 	  
 	  //r = 1 when end of directory
 	  if((f_pos-2)*OSPFS_DIRENTRY_SIZE > dir_oi->oi_size)
