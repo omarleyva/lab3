@@ -1139,8 +1139,12 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 
 	//ERROR CHECKS!!
 
+	eprintk("1\n");
+
 	//   1.5 Find an empty directory entry using the helper functions above.
 	ospfs_direntry_t *new_entry = create_blank_direntry(ospfs_inode(dir->i_ino));	
+
+	eprintk("2\n");
 
 	//   2. Find an empty inode.  Set the 'entry_ino' variable to its inode number.
 	uint32_t inode_count = 0;
@@ -1154,16 +1158,24 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	      }
 	  }
 
+	eprintk("3\n");
+
 	if(entry_ino == 0) //No inode available. 
 	  return -ENOSPC;
 
 
 	//   3. Initialize the directory entry
 	new_entry->od_ino = entry_ino;
+
+	eprintk("31\n");
 	memcpy(new_entry->od_name,dentry->d_name.name,dentry->d_name.len);
+	eprintk("32\n");
 	new_entry->od_name[dentry->d_name.len] == '\0';
 	//Must be null terminated. Length not passed in direntry
+	eprintk("33\n");
 	entry_inode->oi_nlink++;
+
+	eprintk("4\n");
 
 	//   4. Initialize the inode
 	entry_inode->oi_size = 0;
