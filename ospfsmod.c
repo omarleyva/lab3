@@ -447,9 +447,11 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	while (r == 0 && ok_so_far >= 0 && f_pos >= 2) {
 
 	  //Get a pointer to next entry in directory. 
-	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,f_pos);
+	  ospfs_direntry_t *od = ospfs_inode_data(dir_oi,f_pos*OSPFS_DIRENTRY_SIZE);
 	  ospfs_inode_t *entry_oi = ospfs_inode(od->od_ino);
 	  uint32_t file_type;	
+	  
+	  
 	  
 	  //r = 1 when end of directory
 	  if((f_pos-2)*OSPFS_DIRENTRY_SIZE > dir_oi->oi_size)
@@ -458,15 +460,12 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	      break;
 	    }
 	  
-	  eprintk("hi2\n");
 	  //Ignore blank directory entries. 
-	  if(od == 0)
+	  if(od->od_ino == 0)
 	    {
-	  eprintk("hi3\n");	  
 	      f_pos++;
 	      continue;
 	    }
- eprintk("hi3\n");	  
 	  //Figure out whether file is reg/dir/symlink
 	  if(entry_oi->oi_ftype == OSPFS_FTYPE_REG)
 	    file_type = DT_REG;
@@ -474,14 +473,12 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	    file_type = DT_DIR;
 	  if(entry_oi->oi_ftype == OSPFS_FTYPE_SYMLINK)
 	    file_type = DT_LNK;
- 	  eprintk("hi3\n");	  
 	  //Fill directory entry. 
 	  ok_so_far = filldir(dirent,od->od_name,strlen(od->od_name),f_pos,od->od_ino,file_type);
 
 	  //Advance f_pos when dir successfully read
 	  if(ok_so_far >= 0)
-	    {
-	      eprintk("hi4\n");
+	    {	
 	      f_pos++;
 	    }
 	  else
@@ -489,36 +486,6 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	      r = 0;
 	      break;
 	    }
-		
-		/* If at the end of the directory, set 'r' to 1 and exit
-		 * the loop.  For now we do this all the time.
-		 *
-		 * EXERCISE: Your code here */
-	  
-	  r = 1;		/* Fix me! */
-		break;		/* Fix me! */
-		
-		/* Get a pointer to the next entry (od) in the directory.
-		 * The file system interprets the contents of a
-		 * directory-file as a sequence of ospfs_direntry structures.
-		 * You will find 'f_pos' and 'ospfs_inode_data' useful.
-		 *
-		 * Then use the fields of that file to fill in the directory
-		 * entry.  To figure out whether a file is a regular file or
-		 * another directory, use 'ospfs_inode' to get the directory
-		 * entry's corresponding inode, and check out its 'oi_ftype'
-		 * member.
-		 *
-		 * Make sure you ignore blank directory entries!  (Which have
-		 * an inode number of 0.)
-		 *
-		 * If the current entry is successfully read (the call to
-		 * filldir returns >= 0), or the current entry is skipped,
-		 * your function should advance f_pos by the proper amount to
-		 * advance to the next directory entry.
-		 */
-		
-		/* EXERCISE: Your code here */
 	}
 
 	// Save the file position and return!
