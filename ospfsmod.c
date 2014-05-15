@@ -729,8 +729,10 @@ add_block(ospfs_inode_t *oi)
 	    eprintk("block = %d\n",allocated[0]);
 	    
 	    allocated[1] = allocate_block();
-	    if(allocated[0] == 0) //Unable to allocate a block
-	      {
+            
+	    //Israel: Should be 1 if(allocated[0] == 0) 
+	    if (allocated[1] == 0) // Unable to allocate a block
+              {
 		free_block(allocated[0]);
 		return -ENOSPC; 
 	      }	    
@@ -742,14 +744,53 @@ add_block(ospfs_inode_t *oi)
 	    
 	    //First value is set to data block
 	    indirect_block[0] = allocated[1];
-	    oi->oi_indirect = allocated[0];
-
-	    
+	    //Israel: shouldn't this be pointing to the indirect_block? 
+            //oi->oi_indirect = allocated[0];
+            oi->oi_indirect = indirect_block;	    
 	  }
+  /*      if (n > OSPFS_NDIRECT && n < OSPFS_NINDIRECT+OSPFS_NDIRECT)
+        {
+       	    allocated[0] = allocate_block();
+	    if(allocated[0] == 0) //Unable to allocate a block
+	      return -ENOSPC; 
+	    memset(ospfs_block(allocated[0]),0,OSPFS_BLKSIZE);
+	    oi->oi_indirect[n+1-OSPFS_NDIRECT] = allocated[0];
+        }
+*/
+/*        if (n > OSPFS_NINDIRECT+OSPFS_NDIRECT && 
+              n < OSPFS_NINDIRECT*OSPFS_NINDIRECT+OSPFS_NINDIRECT+OSPFS_NDIRECT)
+        {
+            eprintk("hi\n");
+	    allocated[0] = allocate_block();
+	    if(allocated[0] == 0) //Unable to allocate a block
+	      return -ENOSPC; 
+	    
+	    eprintk("block = %d\n",allocated[0]);
+	    
+	    allocated[1] = allocate_block();
+            
+	    //Israel: Should be 1 if(allocated[0] == 0) 
+	    if (allocated[1] == 0) // Unable to allocate a block
+              {
+		free_block(allocated[0]);
+		return -ENOSPC; 
+	      }	    
+
+	    //Create new indirect_block
+	    uint32_t *indirect_block = ospfs_block(allocated[0]);
+	    memset(indirect_block,0,OSPFS_BLKSIZE);
+	    memset(ospfs_block(allocated[1]),0,OSPFS_BLKSIZE);
+	    
+	    //First value is set to data block
+	    indirect_block[0] = allocated[1];
+	    //Israel: shouldn't this be pointing to the indirect_block? 
+            //oi->oi_indirect = allocated[0];
+            oi->oi_indirect = indirect_block;	    
+	  
+        }
+*/
 	// Update the oi->oi_size field
 	oi->oi_size += OSPFS_BLKSIZE;
-	
-	
 	
 	return 0; // Replace this line
 }
